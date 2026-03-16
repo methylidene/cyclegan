@@ -116,17 +116,17 @@ def main():
     print(f"当前运行设备: {device}")
 
     # ---------------- 🌟 路径与超参数配置区 ----------------
-    DATA_ROOT = 'E:/A-academics/4_1/毕业设计/data/test01' 
-    EXP_NAME = 'exp_01_baseline_local_test'
+    DATA_ROOT = '/root/autodl-tmp/data/test01' 
+    EXP_NAME = 'exp_01_baseline_cloud_3090_test'
     
-    OUTPUT_DIR = os.path.join('output', EXP_NAME) 
+    OUTPUT_DIR = os.path.join('/root/autodl-tmp/cyclegan/output', EXP_NAME) 
     IMAGE_DIR = os.path.join(OUTPUT_DIR, 'images')
     CHECKPOINT_DIR = os.path.join(OUTPUT_DIR, 'checkpoints')
 
     os.makedirs(IMAGE_DIR, exist_ok=True)
     os.makedirs(CHECKPOINT_DIR, exist_ok=True)
 
-    BATCH_SIZE = 1 
+    BATCH_SIZE = 4 
     EPOCHS = 200     # 实际上限设置高一些
     LR = 0.0002
     SAMPLE_INTERVAL = 50 
@@ -139,8 +139,11 @@ def main():
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
+    # dataloader = DataLoader(UnpairedDataset(DATA_ROOT, transform=transforms_), 
+    #                         batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
     dataloader = DataLoader(UnpairedDataset(DATA_ROOT, transform=transforms_), 
-                            batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
+                            batch_size=BATCH_SIZE, shuffle=True, 
+                            num_workers=8, pin_memory=True)
 
     # 初始化网络
     G_AB = Generator().to(device) 
