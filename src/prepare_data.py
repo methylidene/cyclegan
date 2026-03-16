@@ -74,8 +74,8 @@ def process_u1652_subset_by_class(source_dir, target_dir, num_classes=50):
     print(f"\n✅ 基于 {num_classes} 个地点的子集构建完成！")
 
 if __name__ == '__main__':
-    SOURCE = '/root/autodl-tmp/data/University-Release' 
-    TARGET = '/root/autodl-tmp/data/test01' 
+    SOURCE = '/root/autodl-tmp/cyclegan/data/University-Release' 
+    TARGET = '/root/autodl-tmp/cyclegan/data/test01' 
     
     # 【核心参数】你想用多少栋建筑来做前期测试？
     # U-1652 训练集总共有 701 栋建筑。前期测试设为 50 或 100 即可。

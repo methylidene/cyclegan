@@ -116,7 +116,7 @@ def main():
     print(f"当前运行设备: {device}")
 
     # ---------------- 🌟 路径与超参数配置区 ----------------
-    DATA_ROOT = '/root/autodl-tmp/data/test01' 
+    DATA_ROOT = '/root/autodl-tmp/cyclegan/data/test01' 
     EXP_NAME = 'exp_01_baseline_cloud_3090_test'
     
     OUTPUT_DIR = os.path.join('/root/autodl-tmp/cyclegan/output', EXP_NAME) 
