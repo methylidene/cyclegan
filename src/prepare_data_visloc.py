@@ -15,22 +15,29 @@ def process_visloc_dataset(raw_root, out_root, patch_size=256, sat_stride=150, m
     for d in dirs:
         os.makedirs(os.path.join(out_root, d), exist_ok=True)
 
-    # 获取并排序所有子目录 (UAV-VisLoc-01 到 11)
-    sub_dirs = sorted([d for d in glob.glob(os.path.join(raw_root, 'UAV-VisLoc-*')) if os.path.isdir(d)])
+    sub_dirs = []
+    for d in glob.glob(os.path.join(raw_root, '*')):
+        if os.path.isdir(d):
+            folder_name = os.path.basename(d)
+            # 严格判断：只有文件夹名是纯数字（如 '01', '02', '11'）才加入处理列表
+            if folder_name.isdigit():
+                sub_dirs.append(d)
+                
+    sub_dirs = sorted(sub_dirs)
     
     if not sub_dirs:
-        print(f"❌ 未找到 UAV-VisLoc-* 文件夹，请检查 RAW_DATASET_ROOT")
+        print(f"❌ 未找到纯数字命名的区域文件夹，请检查 RAW_DATASET_ROOT")
         return
 
     print(f"🔍 发现 {len(sub_dirs)} 个区域文件夹，准备全量处理...\n")
     stats = {'trainA': 0, 'trainB': 0, 'testA': 0, 'testB': 0}
 
     for sub_dir in sub_dirs:
-        folder_name = os.path.basename(sub_dir) # 如: UAV-VisLoc-01
+        folder_name = os.path.basename(sub_dir) # 如: '01'
         
-        # 判断是分入训练集还是测试集
-        # 提取文件夹后面的数字
-        region_id = int(folder_name.split('-')[-1])
+        #直接把纯数字字符串转为整数
+        region_id = int(folder_name)
+        
         if region_id <= 9:
             phase = 'train'
         else:
