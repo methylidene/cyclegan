@@ -61,42 +61,96 @@ def process_visloc_dataset(raw_root, out_root, patch_size=256, sat_stride=150, m
                     cv2.imwrite(os.path.join(dir_A, save_name), img_resized)
                     stats[f'{phase}A'] += 1
 
-        # ================= 2. 处理 Satellite TIF 图像 =================
+        # # ================= 2. 处理 Satellite TIF 图像 =================
+        # tif_files = glob.glob(os.path.join(sub_dir, '*.tif'))
+        # for tif_path in tif_files:
+        #     tif_name = os.path.splitext(os.path.basename(tif_path))[0]
+        #     img_sat = cv2.imread(tif_path, cv2.IMREAD_UNCHANGED)
+        #     if img_sat is None: continue
+                
+        #     if img_sat.dtype != np.uint8:
+        #         img_sat = cv2.normalize(img_sat, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        #     if len(img_sat.shape) == 2:
+        #         img_sat = cv2.cvtColor(img_sat, cv2.COLOR_GRAY2BGR)
+
+        #     h, w = img_sat.shape[:2]
+        #     patch_count = 0
+            
+        #     # 使用略大的 stride 或限制数量，避免单张卫星图产出过多无用重叠
+        #     with tqdm(total=max_sat_per_folder, desc=f"  [Satellite]", leave=False) as pbar:
+        #         for y in range(0, h - patch_size + 1, sat_stride):
+        #             for x in range(0, w - patch_size + 1, sat_stride):
+        #                 if phase == 'train' and patch_count >= max_sat_per_folder:
+        #                     break
+                        
+        #                 patch = img_sat[y:y+patch_size, x:x+patch_size]
+                        
+        #                 # 标准差过滤：剔除全黑边或大面积单一色彩（如死水、白云）
+        #                 if np.std(patch) < 15.0: 
+        #                     continue
+                            
+        #                 save_name = f"{folder_name}_{tif_name}_patch_{patch_count:04d}.jpg"
+        #                 cv2.imwrite(os.path.join(dir_B, save_name), patch)
+        #                 patch_count += 1
+        #                 stats[f'{phase}B'] += 1
+        #                 pbar.update(1)
+                        
+        #             if phase == 'train' and patch_count >= max_sat_per_folder:
+        #                 break
+
+
+        # ================= 2. 处理 Satellite TIF 图像 (超低内存版) =================
+        import rasterio
+        from rasterio.windows import Window
+        
         tif_files = glob.glob(os.path.join(sub_dir, '*.tif'))
         for tif_path in tif_files:
             tif_name = os.path.splitext(os.path.basename(tif_path))[0]
-            img_sat = cv2.imread(tif_path, cv2.IMREAD_UNCHANGED)
-            if img_sat is None: continue
-                
-            if img_sat.dtype != np.uint8:
-                img_sat = cv2.normalize(img_sat, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
-            if len(img_sat.shape) == 2:
-                img_sat = cv2.cvtColor(img_sat, cv2.COLOR_GRAY2BGR)
-
-            h, w = img_sat.shape[:2]
-            patch_count = 0
             
-            # 使用略大的 stride 或限制数量，避免单张卫星图产出过多无用重叠
-            with tqdm(total=max_sat_per_folder, desc=f"  [Satellite]", leave=False) as pbar:
-                for y in range(0, h - patch_size + 1, sat_stride):
-                    for x in range(0, w - patch_size + 1, sat_stride):
-                        if phase == 'train' and patch_count >= max_sat_per_folder:
-                            break
-                        
-                        patch = img_sat[y:y+patch_size, x:x+patch_size]
-                        
-                        # 标准差过滤：剔除全黑边或大面积单一色彩（如死水、白云）
-                        if np.std(patch) < 15.0: 
-                            continue
-                            
-                        save_name = f"{folder_name}_{tif_name}_patch_{patch_count:04d}.jpg"
-                        cv2.imwrite(os.path.join(dir_B, save_name), patch)
-                        patch_count += 1
-                        stats[f'{phase}B'] += 1
-                        pbar.update(1)
-                        
-                    if phase == 'train' and patch_count >= max_sat_per_folder:
-                        break
+            try:
+                # 使用 rasterio 打开超大 TIF，此时【不】会加载图像像素到内存
+                with rasterio.open(tif_path) as src:
+                    h, w = src.height, src.width
+                    patch_count = 0
+                    
+                    with tqdm(total=max_sat_per_folder, desc=f"  [Satellite]", leave=False) as pbar:
+                        for y in range(0, h - patch_size + 1, sat_stride):
+                            for x in range(0, w - patch_size + 1, sat_stride):
+                                if phase == 'train' and patch_count >= max_sat_per_folder:
+                                    break
+                                
+                                # 核心：只从硬盘读取当前坐标下的 256x256 小窗口
+                                window = Window(x, y, patch_size, patch_size)
+                                patch = src.read(window=window)
+                                
+                                # rasterio 读取的格式是 (Channel, Height, Width)，需要转成 OpenCV 习惯的 (H, W, C)
+                                patch = np.transpose(patch, (1, 2, 0))
+                                
+                                # 提取 RGB 通道并转换为 BGR (OpenCV 的默认保存格式)
+                                if patch.shape[2] >= 3:
+                                    patch = patch[:, :, :3]
+                                    patch = cv2.cvtColor(patch, cv2.COLOR_RGB2BGR)
+                                elif patch.shape[2] == 1:
+                                    patch = cv2.cvtColor(patch, cv2.COLOR_GRAY2BGR)
+                                
+                                # 归一化高位深图像 (如 16-bit 降至 8-bit)
+                                if patch.dtype != np.uint8:
+                                    patch = cv2.normalize(patch, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+                                
+                                # 剔除无效或大片单一颜色的色块
+                                if np.std(patch) < 15.0: 
+                                    continue
+                                    
+                                save_name = f"{folder_name}_{tif_name}_patch_{patch_count:04d}.jpg"
+                                cv2.imwrite(os.path.join(dir_B, save_name), patch)
+                                patch_count += 1
+                                stats[f'{phase}B'] += 1
+                                pbar.update(1)
+                                
+                            if phase == 'train' and patch_count >= max_sat_per_folder:
+                                break
+            except Exception as e:
+                print(f"  ❌ 读取 TIF 失败 {tif_path}: {e}")
 
     print("\n✅ 数据预处理全部完成！")
     print(f"📊 统计信息: ")
