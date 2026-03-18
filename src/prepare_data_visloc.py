@@ -1,0 +1,110 @@
+import os
+import glob
+import cv2
+import numpy as np
+from tqdm import tqdm
+
+def process_visloc_dataset(raw_root, out_root, patch_size=256, sat_stride=150, max_sat_per_folder=800):
+    """
+    UAV-VISLOC 全量数据预处理：
+    - 前 9 个区域 (01-09) 作为训练集 (trainA, trainB)
+    - 后 2 个区域 (10-11) 作为测试集 (testA, testB) 做到地理隔离
+    """
+    # 创建需要的输出目录
+    dirs = ['trainA', 'trainB', 'testA', 'testB']
+    for d in dirs:
+        os.makedirs(os.path.join(out_root, d), exist_ok=True)
+
+    # 获取并排序所有子目录 (UAV-VisLoc-01 到 11)
+    sub_dirs = sorted([d for d in glob.glob(os.path.join(raw_root, 'UAV-VisLoc-*')) if os.path.isdir(d)])
+    
+    if not sub_dirs:
+        print(f"❌ 未找到 UAV-VisLoc-* 文件夹，请检查 RAW_DATASET_ROOT")
+        return
+
+    print(f"🔍 发现 {len(sub_dirs)} 个区域文件夹，准备全量处理...\n")
+    stats = {'trainA': 0, 'trainB': 0, 'testA': 0, 'testB': 0}
+
+    for sub_dir in sub_dirs:
+        folder_name = os.path.basename(sub_dir) # 如: UAV-VisLoc-01
+        
+        # 判断是分入训练集还是测试集
+        # 提取文件夹后面的数字
+        region_id = int(folder_name.split('-')[-1])
+        if region_id <= 9:
+            phase = 'train'
+        else:
+            phase = 'test'
+            
+        dir_A = os.path.join(out_root, f"{phase}A")
+        dir_B = os.path.join(out_root, f"{phase}B")
+        print(f"▶️ 处理 {folder_name} -> 划分至 [{phase}集]")
+
+        # ================= 1. 处理 Drone 图像 (全量提取) =================
+        drone_dir = os.path.join(sub_dir, 'drone')
+        if os.path.exists(drone_dir):
+            drone_imgs = [os.path.join(drone_dir, f) for f in os.listdir(drone_dir) 
+                          if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+            
+            for img_path in tqdm(drone_imgs, desc=f"  [Drone]", leave=False):
+                img = cv2.imread(img_path)
+                if img is not None:
+                    img_resized = cv2.resize(img, (patch_size, patch_size))
+                    save_name = f"{folder_name}_drone_{os.path.basename(img_path)}"
+                    cv2.imwrite(os.path.join(dir_A, save_name), img_resized)
+                    stats[f'{phase}A'] += 1
+
+        # ================= 2. 处理 Satellite TIF 图像 =================
+        tif_files = glob.glob(os.path.join(sub_dir, '*.tif'))
+        for tif_path in tif_files:
+            tif_name = os.path.splitext(os.path.basename(tif_path))[0]
+            img_sat = cv2.imread(tif_path, cv2.IMREAD_UNCHANGED)
+            if img_sat is None: continue
+                
+            if img_sat.dtype != np.uint8:
+                img_sat = cv2.normalize(img_sat, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+            if len(img_sat.shape) == 2:
+                img_sat = cv2.cvtColor(img_sat, cv2.COLOR_GRAY2BGR)
+
+            h, w = img_sat.shape[:2]
+            patch_count = 0
+            
+            # 使用略大的 stride 或限制数量，避免单张卫星图产出过多无用重叠
+            with tqdm(total=max_sat_per_folder, desc=f"  [Satellite]", leave=False) as pbar:
+                for y in range(0, h - patch_size + 1, sat_stride):
+                    for x in range(0, w - patch_size + 1, sat_stride):
+                        if phase == 'train' and patch_count >= max_sat_per_folder:
+                            break
+                        
+                        patch = img_sat[y:y+patch_size, x:x+patch_size]
+                        
+                        # 标准差过滤：剔除全黑边或大面积单一色彩（如死水、白云）
+                        if np.std(patch) < 15.0: 
+                            continue
+                            
+                        save_name = f"{folder_name}_{tif_name}_patch_{patch_count:04d}.jpg"
+                        cv2.imwrite(os.path.join(dir_B, save_name), patch)
+                        patch_count += 1
+                        stats[f'{phase}B'] += 1
+                        pbar.update(1)
+                        
+                    if phase == 'train' and patch_count >= max_sat_per_folder:
+                        break
+
+    print("\n✅ 数据预处理全部完成！")
+    print(f"📊 统计信息: ")
+    print(f"   训练集: 航拍(trainA) {stats['trainA']}张, 卫星(trainB) {stats['trainB']}张")
+    print(f"   测试集: 航拍(testA) {stats['testA']}张, 卫星(testB) {stats['testB']}张")
+
+if __name__ == "__main__":
+    # 配置你的路径
+    RAW_DATASET_ROOT = "/root/autodl-tmp/cyclegan/data/uav_visloc"
+    OUTPUT_DATASET_ROOT = "/root/autodl-tmp/cyclegan/data/test02"
+    
+    process_visloc_dataset(
+        raw_root=RAW_DATASET_ROOT,
+        out_root=OUTPUT_DATASET_ROOT,
+        patch_size=256,
+        sat_stride=150,               
+        max_sat_per_folder=800  # 9个训练文件夹 * 800 ≈ 7200张卫星图，与无人机图数量完美匹配
+    )
