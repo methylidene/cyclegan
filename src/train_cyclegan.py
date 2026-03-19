@@ -156,7 +156,7 @@ def main():
 
     dataloader = DataLoader(UnpairedDataset(DATA_ROOT, transform=transforms_), 
                             batch_size=BATCH_SIZE, shuffle=True, 
-                            num_workers=8, pin_memory=True)
+                            num_workers=4, pin_memory=False)
 
     G_AB = Generator().to(device) 
     G_BA = Generator().to(device) 
