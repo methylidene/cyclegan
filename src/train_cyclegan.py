@@ -104,14 +104,14 @@ class Discriminator(nn.Module):
         )
     def forward(self, x): return self.model(x)
 
-# ================= 学习率衰减策略 =================
+# ================= 学习率衰减策略 (已修复负数 Bug) =================
 class LambdaLR:
-    def __init__(self, n_epochs, offset, decay_start_epoch):
+    def __init__(self, n_epochs, decay_start_epoch):
         self.n_epochs = n_epochs
-        self.offset = offset
         self.decay_start_epoch = decay_start_epoch
     def step(self, epoch):
-        return 1.0 - max(0, epoch + self.offset - self.decay_start_epoch) / (self.n_epochs - self.decay_start_epoch)
+        # 保证衰减比例最小为 0，绝对不让它变成负数
+        return max(0.0, 1.0 - max(0, epoch - self.decay_start_epoch) / float(self.n_epochs - self.decay_start_epoch))
 
 # ================= 4. 训练主循环 =================
 def main():
@@ -188,9 +188,12 @@ def main():
         global_step = start_epoch * len(dataloader) # 恢复正确的 step 进度
         print(f"✅ 成功从 Epoch {start_epoch} 恢复。")
 
-    lr_scheduler_G = optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
-    lr_scheduler_D_A = optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
-    lr_scheduler_D_B = optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
+    # lr_scheduler_G = optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
+    # lr_scheduler_D_A = optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
+    # lr_scheduler_D_B = optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(EPOCHS, start_epoch, DECAY_EPOCH).step)
+    lr_scheduler_G = optim.lr_scheduler.LambdaLR(optimizer_G, lr_lambda=LambdaLR(EPOCHS, DECAY_EPOCH).step)
+    lr_scheduler_D_A = optim.lr_scheduler.LambdaLR(optimizer_D_A, lr_lambda=LambdaLR(EPOCHS, DECAY_EPOCH).step)
+    lr_scheduler_D_B = optim.lr_scheduler.LambdaLR(optimizer_D_B, lr_lambda=LambdaLR(EPOCHS, DECAY_EPOCH).step)
 
     if os.path.exists(latest_ckpt_path) and 'lr_scheduler_G' in checkpoint:
         lr_scheduler_G.load_state_dict(checkpoint['lr_scheduler_G'])
