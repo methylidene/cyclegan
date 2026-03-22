@@ -126,7 +126,7 @@ def main():
     # ---------------- 🌟 路径与超参数配置区 ----------------
     # 强烈建议换一个新的输出目录，防止和 Baseline 的权重混淆！
     DATA_ROOT = '/root/autodl-tmp/cyclegan/data/test02' 
-    EXP_NAME = 'exp_03_visloc_ssim_100ep'
+    EXP_NAME = 'exp_04_visloc_ssim_gray_100ep'
     
     OUTPUT_DIR = os.path.join('/root/autodl-tmp/cyclegan/output', EXP_NAME) 
     IMAGE_DIR = os.path.join(OUTPUT_DIR, 'images')
