@@ -44,13 +44,13 @@ def main():
     TEST_IMAGE_PATH_B = '/root/autodl-tmp/cyclegan/data/test02/trainB/01_satellite01_patch_0127.jpg' 
     
     # 2. 权重路径
-    BASELINE_CKPT = '/root/autodl-tmp/cyclegan/output/exp_02_visloc_full_100ep/checkpoints/checkpoint_epoch_20.pth' 
-    V2_CKPT = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/checkpoints/checkpoint_epoch_20.pth' 
+    BASELINE_CKPT = '/root/autodl-tmp/cyclegan/output/exp_02_visloc_full_100ep/checkpoints/checkpoint_epoch_60.pth' 
+    V2_CKPT = '/root/autodl-tmp/cyclegan/output/exp_04_visloc_ssim_gray_100ep/checkpoints/checkpoint_epoch_60.pth' 
     
     # 3. 输出路径
-    OUTPUT_DIR = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/'
-    OUTPUT_COMPARE_A2B = os.path.join(OUTPUT_DIR, 'compare_A2B_epoch20.png')
-    OUTPUT_COMPARE_B2A = os.path.join(OUTPUT_DIR, 'compare_B2A_epoch20.png')
+    OUTPUT_DIR = '/root/autodl-tmp/cyclegan/output/exp_04_visloc_ssim_gray_100ep/'
+    OUTPUT_COMPARE_A2B = os.path.join(OUTPUT_DIR, 'compare_A2B_epoch60_01.png')
+    OUTPUT_COMPARE_B2A = os.path.join(OUTPUT_DIR, 'compare_B2A_epoch60_01.png')
     # -----------------------------------------------
 
     # 初始化 4 个生成器 

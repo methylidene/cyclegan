@@ -242,7 +242,7 @@ def main():
 
                 # SSIM 专属新增：计算结构封印 Loss
                 # 注意 1：必须套上 denormalize 解包护盾
-                # 注意 2：1.0 减去 SSIM 相似度，转化为最小化误差，权重设为 5.0
+                # 注意 2：1.0 减去 SSIM 相似度，转化为最小化误差，权重设为 1.0
                 loss_ssim_A = (1.0 - criterion_SSIM(gray_fake_B, gray_real_A)) * 1.0
                 loss_ssim_B = (1.0 - criterion_SSIM(gray_fake_A, gray_real_B)) * 1.0
 
