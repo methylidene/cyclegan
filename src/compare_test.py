@@ -5,7 +5,7 @@ from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.utils as vutils
 
-# ================= 1. 核心网络结构 (保持独立，防报错) =================
+# ================= 1. 核心网络结构 (保持独立) =================
 class ResidualBlock(nn.Module):
     def __init__(self, in_features):
         super(ResidualBlock, self).__init__()
@@ -33,67 +33,84 @@ class Generator(nn.Module):
     def forward(self, x): return self.model(x)
 
 
-# ================= 2. 核心对比逻辑 =================
+# ================= 2. 核心双向对比逻辑 =================
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"当前运行设备: {device}")
     
     # ---------------- 🌟 极客配置区 ----------------
-    # 1. 挑一张最能“找茬”的图：比如一半是森林，一半是建筑的无人机原图
-    TEST_IMAGE_PATH = '/root/autodl-tmp/cyclegan/data/test02/trainA/填入你选好的图片名.jpg' 
+    # 1. 挑选测试图像 (A: 无人机, B: 卫星)
+    TEST_IMAGE_PATH_A = '/root/autodl-tmp/cyclegan/data/test02/trainA/01_drone_01_0041.JPG' 
+    TEST_IMAGE_PATH_B = '/root/autodl-tmp/cyclegan/data/test02/trainB/01_satellite01_patch_0127.jpg' 
     
-    # 2. Baseline 的权重 (假设你想对比 Epoch 20 的状态)
+    # 2. 权重路径
     BASELINE_CKPT = '/root/autodl-tmp/cyclegan/output/exp_02_visloc_full_100ep/checkpoints/checkpoint_epoch_20.pth' 
-    
-    # 3. V2 (SSIM) 的权重 
     V2_CKPT = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/checkpoints/checkpoint_epoch_20.pth' 
     
-    # 4. 拼图输出路径
-    OUTPUT_COMPARE_PATH = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/compare_result_epoch20.png'
+    # 3. 输出路径
+    OUTPUT_DIR = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/'
+    OUTPUT_COMPARE_A2B = os.path.join(OUTPUT_DIR, 'compare_A2B_epoch20.png')
+    OUTPUT_COMPARE_B2A = os.path.join(OUTPUT_DIR, 'compare_B2A_epoch20.png')
     # -----------------------------------------------
 
-    # 初始化两个生成器 (A -> B，即 无人机 -> 卫星)
-    G_baseline = Generator().to(device)
-    G_v2 = Generator().to(device)
+    # 初始化 4 个生成器 
+    # AB 代表 无人机 -> 卫星，BA 代表 卫星 -> 无人机
+    G_AB_baseline = Generator().to(device)
+    G_BA_baseline = Generator().to(device)
+    G_AB_v2 = Generator().to(device)
+    G_BA_v2 = Generator().to(device)
     
-    # 🌟 极其重要：切换到推理模式 (冻结 Dropout 和 BatchNorm)
-    G_baseline.eval()
-    G_v2.eval()
+    # 切换到推理模式
+    G_AB_baseline.eval(); G_BA_baseline.eval()
+    G_AB_v2.eval(); G_BA_v2.eval()
 
-    print("📥 正在加载 Baseline 权重...")
+    print("📥 正在加载 Baseline 双向权重...")
     checkpoint_base = torch.load(BASELINE_CKPT, map_location=device)
-    G_baseline.load_state_dict(checkpoint_base['G_AB'])
+    G_AB_baseline.load_state_dict(checkpoint_base['G_AB'])
+    G_BA_baseline.load_state_dict(checkpoint_base['G_BA'])
 
-    print("📥 正在加载 V2 (SSIM) 权重...")
+    print("📥 正在加载 V2 (SSIM) 双向权重...")
     checkpoint_v2 = torch.load(V2_CKPT, map_location=device)
-    G_v2.load_state_dict(checkpoint_v2['G_AB'])
+    G_AB_v2.load_state_dict(checkpoint_v2['G_AB'])
+    G_BA_v2.load_state_dict(checkpoint_v2['G_BA'])
 
-    # 图像预处理 (和训练时保持绝对一致)
+    # 图像预处理
     transform = transforms.Compose([
         transforms.Resize((256, 256)),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
 
-    print(f"🔍 正在读取测试图像: {TEST_IMAGE_PATH}")
-    img = Image.open(TEST_IMAGE_PATH).convert('RGB')
-    # unsqueeze(0) 是为了强行加上 Batch 维度，变成 [1, 3, 256, 256]
-    input_tensor = transform(img).unsqueeze(0).to(device) 
-
-    # 🌟 极其重要：关闭梯度跟踪，只做纯粹的矩阵乘法
-    print("🚀 正在生成卫星图...")
-    with torch.no_grad():
-        fake_B_baseline = G_baseline(input_tensor)
-        fake_B_v2 = G_v2(input_tensor)
-
-    # 将三张图在宽度方向(dim=3)直接拼接到一起
-    # 顺序：[真实无人机图] | [Baseline 假卫星图] | [V2 假卫星图]
-    comparison_tensor = torch.cat((input_tensor.data, fake_B_baseline.data, fake_B_v2.data), dim=3)
+    print("🔍 正在读取测试图像...")
+    img_A = Image.open(TEST_IMAGE_PATH_A).convert('RGB')
+    img_B = Image.open(TEST_IMAGE_PATH_B).convert('RGB')
     
-    # 保存并自动解除归一化 (normalize=True 会自动把 [-1, 1] 拉回到 [0, 1])
-    vutils.save_image(comparison_tensor, OUTPUT_COMPARE_PATH, nrow=1, normalize=True)
+    tensor_A = transform(img_A).unsqueeze(0).to(device) 
+    tensor_B = transform(img_B).unsqueeze(0).to(device) 
+
+    # 🌟 关闭梯度跟踪，执行双向推理
+    print("🚀 正在执行双向图像反演...")
+    with torch.no_grad():
+        # A -> B (无人机转卫星)
+        fake_B_baseline = G_AB_baseline(tensor_A)
+        fake_B_v2 = G_AB_v2(tensor_A)
+        
+        # B -> A (卫星转无人机)
+        fake_A_baseline = G_BA_baseline(tensor_B)
+        fake_A_v2 = G_BA_v2(tensor_B)
+
+    # 将图片拼接在一起 (dim=3 是宽度方向拼接)
+    compare_A2B_tensor = torch.cat((tensor_A.data, fake_B_baseline.data, fake_B_v2.data), dim=3)
+    compare_B2A_tensor = torch.cat((tensor_B.data, fake_A_baseline.data, fake_A_v2.data), dim=3)
+    
+    # 保存结果
+    vutils.save_image(compare_A2B_tensor, OUTPUT_COMPARE_A2B, nrow=1, normalize=True)
+    vutils.save_image(compare_B2A_tensor, OUTPUT_COMPARE_B2A, nrow=1, normalize=True)
+    
     print("\n===========================================")
-    print(f"✅ 对比图已生成并保存至: {OUTPUT_COMPARE_PATH}")
-    print("👉 图像从左到右顺序：[原图] | [无SSIM] | [加了SSIM]")
+    print(f"✅ [A -> B] 无人机转卫星对比图: {OUTPUT_COMPARE_A2B}")
+    print(f"✅ [B -> A] 卫星转无人机对比图: {OUTPUT_COMPARE_B2A}")
+    print("👉 图像从左到右顺序均是：[原图] | [Baseline(无SSIM)] | [V2(加了SSIM)]")
     print("===========================================")
 
 if __name__ == '__main__':

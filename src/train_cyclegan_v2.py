@@ -13,7 +13,7 @@ import torchvision.utils as vutils
 from torch.utils.tensorboard import SummaryWriter 
 
 # 🌟 SSIM 专属新增：引入解包工具和第三方计算库
-from utils import denormalize
+from utils import denormalize, rgb_to_gray
 from pytorch_msssim import SSIM
 
 # ================= 1. 数据集定义 =================
@@ -204,7 +204,7 @@ def main():
     
     # 🌟 SSIM 专属新增：初始化结构相似度计算器
     # data_range=1.0 代表解包后的张量在 [0, 1] 之间
-    criterion_SSIM = SSIM(data_range=1.0, size_average=True, channel=3).to(device)
+    criterion_SSIM = SSIM(data_range=1.0, size_average=True, channel=1).to(device)
 
     fake_A_buffer = ImageBuffer()
     fake_B_buffer = ImageBuffer()
@@ -234,11 +234,17 @@ def main():
                 loss_cycle_A = criterion_cycle(recov_A, real_A) * 10.0
                 loss_cycle_B = criterion_cycle(recov_B, real_B) * 10.0
 
-                # 🌟 SSIM 专属新增：计算结构封印 Loss
+                # 先解包 -> 再变灰度 -> 再算 SSIM
+                gray_fake_B = rgb_to_gray(denormalize(fake_B))
+                gray_real_A = rgb_to_gray(denormalize(real_A))
+                gray_fake_A = rgb_to_gray(denormalize(fake_A))
+                gray_real_B = rgb_to_gray(denormalize(real_B))
+
+                # SSIM 专属新增：计算结构封印 Loss
                 # 注意 1：必须套上 denormalize 解包护盾
                 # 注意 2：1.0 减去 SSIM 相似度，转化为最小化误差，权重设为 5.0
-                loss_ssim_A = (1.0 - criterion_SSIM(denormalize(fake_B), denormalize(real_A))) * 5.0
-                loss_ssim_B = (1.0 - criterion_SSIM(denormalize(fake_A), denormalize(real_B))) * 5.0
+                loss_ssim_A = (1.0 - criterion_SSIM(gray_fake_B, gray_real_A)) * 1.0
+                loss_ssim_B = (1.0 - criterion_SSIM(gray_fake_A, gray_real_B)) * 1.0
 
                 # 将 SSIM 损失汇入总损失池
                 loss_G = loss_GAN_AB + loss_GAN_BA + loss_cycle_A + loss_cycle_B + loss_id_A + loss_id_B + loss_ssim_A + loss_ssim_B
