@@ -8,8 +8,7 @@ import torchvision.transforms as transforms
 import torchvision.utils as vutils
 from tqdm import tqdm
 
-# 🌟 强烈建议你之前已经把网络结构抽离到了 models.py 里
-# 如果没有，请把上一个脚本里的 Generator 类复制到这里
+
 from train_cyclegan_v2_1 import Generator 
 
 def denormalize(tensor):
@@ -25,10 +24,10 @@ def main():
     TEST_B_DIR = '/root/autodl-tmp/cyclegan/data/test02/testB'
     
     # 你的 V2 版本权重路径 (等跑到 Epoch 100 的时候填这里)
-    WEIGHTS_PATH = '/root/autodl-tmp/cyclegan/output/exp_03_visloc_ssim_100ep/checkpoints/checkpoint_epoch_100.pth'
+    WEIGHTS_PATH = '/root/autodl-tmp/cyclegan/output/exp_04_visloc_ssim_gray_100ep/checkpoints/checkpoint_epoch_100.pth'
     
     # 生成的假卫星图存放目录 (为了算 FID，必须把图片都存下来)
-    FAKE_B_DIR = '/root/autodl-tmp/cyclegan/output/evaluation/fake_B'
+    FAKE_B_DIR = '/root/autodl-tmp/cyclegan/output/evaluation/fake_B/exp_04_visloc_ssim_gray_100ep'
     os.makedirs(FAKE_B_DIR, exist_ok=True)
     # =================================================
 
