@@ -10,7 +10,7 @@ from tqdm import tqdm
 
 # 🌟 强烈建议你之前已经把网络结构抽离到了 models.py 里
 # 如果没有，请把上一个脚本里的 Generator 类复制到这里
-from train_cyclegan_v2 import Generator 
+from train_cyclegan_v2_1 import Generator 
 
 def denormalize(tensor):
     return (tensor + 1.0) / 2.0
