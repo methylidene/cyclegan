@@ -72,8 +72,13 @@ def main():
             lpips_val = loss_fn_vgg(tensor_A, fake_B)
             total_lpips_distance += lpips_val.item()
             
+            # 🌟 强制剥离原有的混乱后缀，统一保存为无损的小写 .png
+            # os.path.splitext('DJI_001.JPG') 会返回 ('DJI_001', '.JPG')
+            base_name = os.path.splitext(img_name)[0]
+            safe_img_name = f"{base_name}.png"
+            
             # 保存假卫星图到硬盘，准备给 FID 算总账
-            save_path = os.path.join(FAKE_B_DIR, img_name)
+            save_path = os.path.join(FAKE_B_DIR, safe_img_name)
             vutils.save_image(fake_B, save_path, normalize=True)
 
     # 计算平均 LPIPS
