@@ -51,7 +51,7 @@ def main():
     ])
 
     # 获取所有测试图片
-    img_names = [f for f in os.listdir(TEST_A_DIR) if f.endswith(('.png', '.JPG', '.jpeg'))]
+    img_names = [f for f in os.listdir(TEST_A_DIR) if f.endswith(('.png', '.JPG', '.jpg', '.jpeg'))]
     
     total_lpips_distance = 0.0
     
