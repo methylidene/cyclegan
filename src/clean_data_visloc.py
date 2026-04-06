@@ -17,7 +17,7 @@ def calculate_blur_variance(image_path):
 # ================= 第一步：试算分布 (探底细) =================
 def step1_analyze_distribution(source_dir, sample_size=1000):
     """随机抽取一批图片，计算方差分布，为你提供阈值参考"""
-    images = [f for f in os.listdir(source_dir) if f.endswith(('.png', '.jpg'))]
+    images = [f for f in os.listdir(source_dir) if f.endswith(('.png', '.jpg','.JPG'))]
     sample_images = random.sample(images, min(sample_size, len(images)))
     
     print(f"\n🔍 [Step 1] 正在对 {len(sample_images)} 张图片进行方差分布试算...")
@@ -93,7 +93,7 @@ def step3_full_filter(source_dir, good_dir, bad_dir, final_threshold):
 
 if __name__ == '__main__':
     # 你的无人机数据集路径 (以 A 域为例)
-    INPUT_DIR = '/root/autodl-tmp/cyclegan/data/visloc_full/trainA'
+    INPUT_DIR = '/root/autodl-tmp/cyclegan/data/test02/trainA'
     
     # ---------------- 流程控制台 ----------------
     # 建议你每次只解除其中一个注释，分步执行！
